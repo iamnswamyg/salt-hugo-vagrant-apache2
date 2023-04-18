@@ -4,5 +4,5 @@ hugo_deployment_data:
   home_dir: /home/hugo
   github_account: iamnswamyg
   site_repo_name: hugo-example
-  nginx_document_root: /var/www
-  domain_name: saltswamyhugo.nshift.com
+  apache2_document_root: /var/www/html
+  domain: saltswamyhugo.nshift.com

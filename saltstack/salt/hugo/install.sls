@@ -1,6 +1,6 @@
-nginx_pkg:
+apache2_pkg:
   pkg.installed:
-    - name: nginx
+    - name: apache2
 
 git_pkg:
   pkg.installed:

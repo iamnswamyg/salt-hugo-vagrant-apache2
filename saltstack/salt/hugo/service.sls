@@ -1,8 +1,8 @@
-nginx_service:
+apache2_service:
   service.running:
-    - name: nginx
+    - name: apache2
     - enable: True
-    - require:
-      - file: nginx_symlink
+    - reload: True
     - watch:
-      - file: nginx_config
+      - pkg: apache2_pkg
+    

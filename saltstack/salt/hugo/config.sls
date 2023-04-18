@@ -21,40 +21,87 @@ hugo_site_repo:
       - pkg: git_pkg
       - user: hugo_user
 
-nginx_default:
-  file.absent:
-    - name: '/etc/nginx/sites-enabled/default'
+Turn Off KeepAlive:
+  file.replace:
+    - name: /etc/apache2/apache2.conf
+    - pattern: 'KeepAlive On'
+    - repl: 'KeepAlive Off'
+    - show_changes: True
     - require:
-      - pkg: nginx_pkg
+      - pkg: apache2_pkg
 
-nginx_config:
+/etc/apache2/conf-available/tune_apache.conf:
   file.managed:
-    - name: /etc/nginx/sites-available/hugo_site
-    - source: salt://hugo/files/hugo_site
-    - user: root
-    - group: root
-    - mode: 0644
-    - template: jinja
+    - source: salt://hugo/files/tune_apache.conf
     - require:
-      - pkg: nginx_pkg
+      - pkg: apache2_pkg
 
-nginx_symlink:
-  file.symlink:
-    - name: /etc/nginx/sites-enabled/hugo_site
-    - target: /etc/nginx/sites-available/hugo_site
-    - user: root
-    - group: root
+Enable tune_apache:
+  apache_conf.enabled:
+    - name: tune_apache
     - require:
-      - file: nginx_config
+      - pkg: apache2_pkg
 
-nginx_document_root:
+apache2_document_root:
   file.directory:
-    - name: {{ pillar['hugo_deployment_data']['nginx_document_root'] }}/{{ pillar['hugo_deployment_data']['site_repo_name'] }}
+    - name: {{ pillar['hugo_deployment_data']['apache2_document_root'] }}/{{ pillar['hugo_deployment_data']['domain'] }}
     - user: {{ pillar['hugo_deployment_data']['user'] }}
     - group: {{ pillar['hugo_deployment_data']['group'] }}
     - dir_mode: 0755
     - require:
       - user: hugo_user
+
+apache2_document_publichtml:
+  file.directory:
+    - name: {{ pillar['hugo_deployment_data']['apache2_document_root'] }}/{{ pillar['hugo_deployment_data']['domain'] }}/public_html
+    - user: {{ pillar['hugo_deployment_data']['user'] }}
+    - group: {{ pillar['hugo_deployment_data']['group'] }}
+    - dir_mode: 0755
+    - require:
+      - user: hugo_user
+
+apache2_document_log:
+  file.directory:
+    - name: {{ pillar['hugo_deployment_data']['apache2_document_root'] }}/{{ pillar['hugo_deployment_data']['domain'] }}/log
+    - user: {{ pillar['hugo_deployment_data']['user'] }}
+    - group: {{ pillar['hugo_deployment_data']['group'] }}
+    - dir_mode: 0755
+    - require:
+      - user: hugo_user
+
+apache2_document_backups:
+  file.directory:
+    - name: {{ pillar['hugo_deployment_data']['apache2_document_root'] }}/{{ pillar['hugo_deployment_data']['domain'] }}/backups
+    - user: {{ pillar['hugo_deployment_data']['user'] }}
+    - group: {{ pillar['hugo_deployment_data']['group'] }}
+    - dir_mode: 0755
+    - require:
+      - user: hugo_user
+
+000-default:
+  apache_site.disabled:
+    - require:
+      - pkg: apache2
+
+/etc/apache2/sites-available/{{ pillar['hugo_deployment_data']['domain'] }}.conf:
+  apache.configfile:
+    - config:
+      - VirtualHost:
+          this: '*:80'
+          ServerName:
+            - {{ pillar['hugo_deployment_data']['domain'] }}
+          ServerAlias:
+            - www.{{ pillar['hugo_deployment_data']['domain'] }}
+          DocumentRoot: {{ pillar['hugo_deployment_data']['apache2_document_root'] }}/{{ pillar['hugo_deployment_data']['domain'] }}/public_html
+          ErrorLog: {{ pillar['hugo_deployment_data']['apache2_document_root'] }}/{{ pillar['hugo_deployment_data']['domain'] }}/log/error.log
+          CustomLog: {{ pillar['hugo_deployment_data']['apache2_document_root'] }}/{{ pillar['hugo_deployment_data']['domain'] }}/log/access.log combined
+
+Enable {{ pillar['hugo_deployment_data']['domain'] }} site:
+  apache_site.enabled:
+    - name: {{ pillar['hugo_deployment_data']['domain'] }}
+    - require:
+      - pkg: apache2_pkg
+
 
 build_script:
   file.managed:
@@ -66,12 +113,13 @@ build_script:
     - template: jinja
     - require:
       - user: hugo_user
+  
   cmd.run:
     - name: ./deploy.sh
     - cwd: {{ pillar['hugo_deployment_data']['home_dir'] }}
     - runas: {{ pillar['hugo_deployment_data']['user'] }}
-    - creates: {{ pillar['hugo_deployment_data']['nginx_document_root'] }}/{{ pillar['hugo_deployment_data']['site_repo_name'] }}/index.html
+    - creates: {{ pillar['hugo_deployment_data']['apache2_document_root'] }}/{{ pillar['hugo_deployment_data']['domain'] }}/public_html/index.html
     - require:
       - file: build_script
       - cmd: hugo_site_repo
-      - file: nginx_document_root
+      - file: apache2_document_publichtml
